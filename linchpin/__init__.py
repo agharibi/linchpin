@@ -21,7 +21,7 @@ CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
 
 class LinchpinAliases(click.Group):
 
-    lp_commands = ['init', 'up', 'destroy']
+    lp_commands = ['init', 'up', 'destroy', 'list']
     lp_aliases = {
             'rise': 'up',
             'drop': 'destroy',
@@ -289,7 +289,34 @@ def drop(ctx, pinfile, targets):
     pass
 
 
+@runcli.command()
+@click.option('--remote', default=None, required=False, help="upstream url for topology")
+@click.option('--topos', is_flag=True, default=False)
+@click.option('--layouts', is_flag=True, default=False)
+@pass_context
+def list(ctx, remote, topos, layouts):
+    """
+    Lists the topologies and layouts from local directories and/or remote repositories
 
+    """
+
+    lpcli = LinchpinCli(ctx)
+    if remote is None:
+        if "WORKSPACE" in os.environ:
+            workspace = os.environ['WORKSPACE']
+        else:
+            workspace = os.environ['HOME']
+    if topos:
+        click.echo(": TOPOLOGIES LIST :")
+        topoDir = workspace + "/topologies/"
+        for fd in os.listdir(topoDir):
+            click.echo(fd)
+        print os.listdir(topoDir)
+    if layouts:
+        click.echo(": LAYOUTS LIST :")
+        layoutDir = workspace + "/layouts/"
+        for fd in os.listdir(layoutDir):
+            click.echo(fd)
 
 
 #@cli.group()
