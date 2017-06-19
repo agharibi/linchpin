@@ -21,7 +21,7 @@ CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
 
 class LinchpinAliases(click.Group):
 
-    lp_commands = ['init', 'up', 'destroy', 'list']
+    lp_commands = ['init', 'up', 'destroy', 'layout', 'topology']
     lp_aliases = {
             'rise': 'up',
             'drop': 'destroy',
@@ -288,36 +288,53 @@ def drop(ctx, pinfile, targets):
 
     pass
 
-
+#START OF TOPOLOGY COMMAND
 @runcli.command()
-@click.option('--remote', default=None, required=False, help="upstream url for topology")
-@click.option('--topos', is_flag=True, default=False)
-@click.option('--layouts', is_flag=True, default=False)
+@click.option('--get', is_flag=True, default=False)
+@click.option('--list', is_flag=True, default=False)
+@click.argument('remote', default=None, required=False)
 @pass_context
-def list(ctx, remote, topos, layouts):
+def topology(ctx, get, list, remote):
     """
-    Lists the topologies and layouts from local directories and/or remote repositories
+    Gets/lists the topologies from local directories anod/or from remote repositories
 
     """
-
     lpcli = LinchpinCli(ctx)
     if remote is None:
         if "WORKSPACE" in os.environ:
             workspace = os.environ['WORKSPACE']
         else:
-            workspace = os.environ['HOME']
-    if topos:
-        click.echo(": TOPOLOGIES LIST :")
+            workspace = os.environ['PWD']
+#Add code that deals with remote repositories here
+    if list:
+        click.echo("TOPOLOGIES")
         topoDir = workspace + "/topologies/"
         for fd in os.listdir(topoDir):
             click.echo(fd)
-        print os.listdir(topoDir)
-    if layouts:
-        click.echo(": LAYOUTS LIST :")
-        layoutDir = workspace + "/layouts/"
+
+#START OF LAYOUT COMMAND
+@runcli.command()
+@click.option('--get', is_flag=True, default=False)
+@click.option('--list', is_flag=True, default=False)
+@click.argument('remote', default=None, required=False)
+@pass_context
+def layout(ctx, get, list, remote):
+    """
+    Gets/lists the layouts from local directories anod/or from remote repositories
+
+    """
+    lpcli = LinchpinCli(ctx)
+    if remote is None:
+        if "WORKSPACE" in os.environ:
+            workspace = os.environ['WORKSPACE']
+        else:
+            workspace = os.environ['PWD']
+#Add code that deals with remote repositories here
+    if list:
+        click.echo("LAYOUTS")
+        layoutDir= workspace + "/topologies/"
         for fd in os.listdir(layoutDir):
             click.echo(fd)
-
 
 #@cli.group()
 #@pass_config
