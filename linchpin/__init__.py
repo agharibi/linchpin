@@ -5,9 +5,11 @@ import sys
 import click
 import shutil
 import logging
+import requests
 
 from distutils import dir_util
 from jinja2 import Environment, PackageLoader
+from urlparse import urlparse
 
 from linchpin.cli import LinchpinCli
 from linchpin.version import __version__
@@ -305,12 +307,33 @@ def topology(ctx, get, list, remote):
             workspace = os.environ['WORKSPACE']
         else:
             workspace = os.environ['PWD']
-#Add code that deals with remote repositories here
-    if list:
-        click.echo("TOPOLOGIES")
-        topoDir = workspace + "/topologies/"
-        for fd in os.listdir(topoDir):
-            click.echo(fd)
+            if list:
+                click.echo("TOPOLOGIES")
+                topoDir = workspace + "/topologies/"
+                for fd in os.listdir(topoDir):
+                    click.echo(fd)
+    else:
+        urlObject = urlparse(remote)
+        username = ""
+        repo = ""
+        path = ""
+        i = 1
+        while urlObject.path[i] != '/':
+            username += urlObject.path[i]
+            i += 1
+        i += 1
+        while i < len(urlObject.path) and urlObject.path[i] != '/':
+            repo += urlObject.path[i]
+            i += 1
+        if (i+1) != len(urlObject.path):
+            path = urlObject.path[i+1:]
+        requestURL = "https://api.github.com/repos/" + username + '/' + repo + '/' + "contents/" + path + "topologies/"
+        print requestURL
+        topoRequest = requests.get(requestURL)
+        #TODO: Handle error
+        topoJson = topoRequest.json()
+        for item in topoJson:
+            print item['name']
 
 #START OF LAYOUT COMMAND
 @runcli.command()
