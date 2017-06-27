@@ -42,13 +42,84 @@ class LinchpinContext(object):
         self.workspace = os.path.realpath(os.path.curdir)
 
 
+#    def load_config(self, lpconfig=None):
+#        """
+#        Create self.cfgs from the linchpin configuration file.
+#
+#        These are the only hardcoded values, which are used to find
+#        the config file. The linchpin.conf file is found
+#        at `/linchpin/library/path/linchpin.conf`.
+#
+#        Alternatively, a full path to the linchpin configuration file
+#        can be passed.
+#
+#        :param lpconfig: absolute path to a linchpin config (default: None)
+#
+#        """
+#
+#        self.cfgs = {}
+#
+#        expanded_path = None
+#        config_found = False
+#
+#        if lpconfig:
+#            CONFIG_PATH = [ lpconfig ]
+#        else:
+#            # simply modify this variable to adjust where linchpin.conf can be found
+#            CONFIG_PATH = [
+#                '{0}/linchpin.conf'.format(self.lib_path)
+#            ]
+#
+#        for path in CONFIG_PATH:
+#            expanded_path = (
+#                "{0}".format(os.path.realpath(os.path.expanduser(path))))
+#
+#            # implement first found
+#            if os.path.exists(expanded_path):
+#                # logging before the config file is setup doesn't work
+#                # if messages are needed before this, use print.
+#                config_found = True
+#                break
+#
+#        if not config_found:
+#            raise LinchpinError('Configuration file not found in'
+#                                ' path: {0}'.format(CONFIG_PATH))
+#
+#        config = ConfigParser.SafeConfigParser()
+#        try:
+#            f = open(path)
+#            config.readfp(f)
+#            f.close()
+#        except ConfigParser.InterpolationSyntaxError as e:
+#            raise LinchpinError('Unable to parse configuration file properly:'
+#                    ' {0}'.format(e))
+#
+#        for section in config.sections():
+#            if section not in self.cfgs:
+#                self.cfgs[section] = {}
+#
+#            # add evars to the ansible extra_vars when running a playbook.
+#            for k, v in config.items(section):
+#                if section != 'evars':
+#                    self.cfgs[section][k] = v
+#                else:
+#                    try:
+#                        self.cfgs[section][k] = config.getboolean(section, k)
+#                    except ValueError as e:
+#                        self.cfgs[section][k] = v
+
     def load_config(self, lpconfig=None):
         """
         Create self.cfgs from the linchpin configuration file.
+        .. note:: Overrides load_config in linchpin.api.LinchpinContext
 
-        These are the only hardcoded values, which are used to find
-        the config file. The linchpin.conf file is found
-        at `/linchpin/library/path/linchpin.conf`.
+        These are the only hardcoded values, which are used to find the config
+        file. The search path, is a first found of the following::
+
+          * $PWD/linchpin.conf
+          * ~/.linchpin.conf
+          * /etc/linchpin.conf
+          * /linchpin/library/path/linchpin.conf
 
         Alternatively, a full path to the linchpin configuration file
         can be passed.
@@ -60,16 +131,27 @@ class LinchpinContext(object):
         self.cfgs = {}
 
         expanded_path = None
-        config_found = False
 
         if lpconfig:
             CONFIG_PATH = [ lpconfig ]
         else:
             # simply modify this variable to adjust where linchpin.conf can be found
             CONFIG_PATH = [
-                '{0}/linchpin.conf'.format(self.lib_path)
+                '{0}/linchpin.conf'.format(self.lib_path),
+                '/etc/linchpin.conf',
+                '~/.linchpin.conf',
+                '{0}/linchpin.conf'.format(
+                            os.path.realpath(os.path.expanduser(os.path.curdir)))
             ]
+           # CONFIG_PATH = [
+           #     '{0}/linchpin.conf'.format(
+           #                 os.path.realpath(os.path.expanduser(os.path.curdir))),
+           #     '~/.linchpin.conf',
+           #     '/etc/linchpin.conf',
+           #     '{0}/linchpin.conf'.format(self.lib_path)
+           # ]
 
+        existing_paths = []
         for path in CONFIG_PATH:
             expanded_path = (
                 "{0}".format(os.path.realpath(os.path.expanduser(path))))
@@ -78,18 +160,20 @@ class LinchpinContext(object):
             if os.path.exists(expanded_path):
                 # logging before the config file is setup doesn't work
                 # if messages are needed before this, use print.
-                config_found = True
-                break
 
-        if not config_found:
+                #if the config file exists in specified path, add to list
+                existing_paths.append(expanded_path) 
+        if len(existing_paths) is 0: 
+            #If none of the paths contain a configuration file, throw an error
             raise LinchpinError('Configuration file not found in'
                                 ' path: {0}'.format(CONFIG_PATH))
 
-        config = ConfigParser.SafeConfigParser()
+        config = ConfigParser.SafeConfigParser() #create new ConfigParser object
         try:
-            f = open(path)
-            config.readfp(f)
-            f.close()
+            for path in existing_paths: #Read all of the configuration files, will overwrite
+                f = open(path)
+                config.readfp(f)
+                f.close()
         except ConfigParser.InterpolationSyntaxError as e:
             raise LinchpinError('Unable to parse configuration file properly:'
                     ' {0}'.format(e))
@@ -107,6 +191,11 @@ class LinchpinContext(object):
                         self.cfgs[section][k] = config.getboolean(section, k)
                     except ValueError as e:
                         self.cfgs[section][k] = v
+        import pdb
+        pdb.set_trace()
+        if 'workspaces' in config.sections():
+            self.workspaceList = {}
+            self.workspaceList = self.cfgs['workspaces']
 
 
     def load_global_evars(self):
@@ -155,6 +244,27 @@ class LinchpinContext(object):
             self.cfgs.update({section: {}})
 
         self.cfgs[section][key] = value
+    def add_cfg(self, section, key, value):
+        """
+        Add a value in cfgs and should persist into a config file for later use
+
+        :param section: section within ini-style config file
+        :param key: key to use
+        :param value: value to set into a section with config file
+        """
+
+        config = ConfigParser.ConfigParser()
+        configPath = "./linchpin.conf"
+        realPath = "{0}".format(os.path.realpath(os.path.expanduser(configPath)))
+       
+        config.read(realPath)
+        if config.has_section(section):
+            config.set(section, key, value)
+            cfgfile = open(realPath, 'w')
+            config.write(cfgfile)
+            cfgfile.close()
+        else:
+            print "The " + section + " section does not exist"
 
 
     def get_evar(self, key=None, default=None):

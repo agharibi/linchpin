@@ -23,7 +23,7 @@ CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
 
 class LinchpinAliases(click.Group):
 
-    lp_commands = ['init', 'up', 'destroy', 'layout', 'topology']
+    lp_commands = ['init', 'up', 'destroy', 'test', 'topology']
     lp_aliases = {
             'rise': 'up',
             'drop': 'destroy',
@@ -104,11 +104,14 @@ def _handle_results(ctx, results):
 @click.option('--creds-path', type=click.Path(), envvar='LP_CREDS',
         help='Use the specified credentials path if WORKSPACE environment variable '
         'is not set')
+@click.option('-n', '--name', type=click.STRING, default=None,
+        help='Use a specified workspace name') #TODO:Edit help text
 @pass_context
-def runcli(ctx, config, workspace, verbose, version, creds_path):
+def runcli(ctx, config, workspace, verbose, version, creds_path, name):
     """linchpin: hybrid cloud orchestration"""
 
     ctx.verbose = verbose
+    ctx.name = name
 
     ctx.load_config(lpconfig=config)
     ctx.load_global_evars()
@@ -290,6 +293,19 @@ def drop(ctx, pinfile, targets):
 
     pass
 
+#TEST COMMAND
+@runcli.command()
+@pass_context
+def test(ctx):
+    """
+    This isn't going in the actual implementation of linchpin. For Alex's use only.
+    """
+    import pdb
+    pdb.set_trace()
+    click.echo("Start test command")
+    ctx.add_cfg('workspaces', 'bob', '~/Dev/whatever')
+
+
 #START OF TOPOLOGY COMMAND
 @runcli.command()
 @click.option('--get', is_flag=True, default=False)
@@ -298,21 +314,24 @@ def drop(ctx, pinfile, targets):
 @pass_context
 def topology(ctx, get, list, remote):
     """
-    Gets/lists the topologies from local directories anod/or from remote repositories
+    Gets/lists the topologies from local directories and/or from remote repositories
 
     """
+
     lpcli = LinchpinCli(ctx)
-    if remote is None:
-        if "WORKSPACE" in os.environ:
-            workspace = os.environ['WORKSPACE']
-        else:
-            workspace = os.environ['PWD']
-            if list:
-                click.echo("TOPOLOGIES")
-                topoDir = workspace + "/topologies/"
-                for fd in os.listdir(topoDir):
-                    click.echo(fd)
+    if not remote:
+        if list:
+            click.echo("TOPOLOGIES")
+            ctx.add_cfg("workspaces", "bob", "~/bobby/bob")
+            print ctx.get_cfg("workspaces","bob",default="well, that didn't work")
+            topoDir = "{0}/{1}".format(ctx.workspace, ctx.get_evar(
+                                        "topologies_folder", 
+                                        default="topologies"))
+            for fd in os.listdir(topoDir):
+                click.echo(fd)
     else:
+        #import pdb
+        #pdb.set_trace()
         urlObject = urlparse(remote)
         username = ""
         repo = ""
@@ -325,13 +344,17 @@ def topology(ctx, get, list, remote):
         while i < len(urlObject.path) and urlObject.path[i] != '/':
             repo += urlObject.path[i]
             i += 1
-        if (i+1) != len(urlObject.path):
-            path = urlObject.path[i+1:]
-        requestURL = "https://api.github.com/repos/" + username + '/' + repo + '/' + "contents/" + path + "topologies/"
-        print requestURL
-        topoRequest = requests.get(requestURL)
+        i += 1
+        if i != len(urlObject.path):
+            path = urlObject.path[i:]
+        url = "https://api.github.com/repos/%s/%s/contents/%s/topologies/" % (username, repo, path) 
+        print url 
+        topoRequest = requests.get(url)
+        if topoRequest.status_code != 200:
+            click.echo("Failed to retrieve")
         #TODO: Handle error
         topoJson = topoRequest.json()
+        print topoJson
         for item in topoJson:
             print item['name']
 
